@@ -18,7 +18,7 @@ header h1{font-size:14px;letter-spacing:2px;color:var(--accent);text-transform:u
 .tab{flex:1;padding:11px;text-align:center;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-#reader{width:100%;max-height:52dvh;flex-shrink:0;background:#000}
+#reader{width:100%;max-height:50dvh;flex-shrink:0;background:#000}
 #reader video{width:100% !important;height:100% !important;object-fit:cover}
 #reader img{display:none}
 .state-bar{padding:9px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1a1a1a;flex-shrink:0;min-height:44px}
@@ -31,7 +31,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 #estado-texto{font-size:12px;flex:1}
 .preview-bar{padding:6px 16px;font-size:9px;color:#444;word-break:break-all;border-bottom:1px solid #111;min-height:30px;flex-shrink:0}
 .log-wrap{flex:1;overflow-y:auto;padding:4px 0}
-.log-item{display:flex;align-items:flex-start;gap:10px;padding:7px 14px;border-bottom:1px solid #111}
+.log-item{display:flex;align-items:flex-start;gap:8px;padding:7px 14px;border-bottom:1px solid #111}
 .log-item .ico{font-size:13px;flex-shrink:0;padding-top:1px}
 .log-item .info{flex:1;min-width:0}
 .log-item .nombre{font-size:12px;color:var(--text);font-weight:bold}
@@ -64,16 +64,12 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
 <main>
   <div id="reader"></div>
-
   <div class="state-bar">
     <div class="dot esperando" id="dot"></div>
     <div id="estado-texto">Iniciando cámara...</div>
   </div>
-
   <div class="preview-bar" id="preview">—</div>
-
   <button class="btn-manual" onclick="abrirManual()">✏ Entrada manual</button>
-
   <div class="log-wrap" id="log"></div>
 </main>
 
@@ -90,11 +86,18 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 </div>
 
 <script>
-const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSevZQcgCF9SXA8vYTR1kij0E-yuFyZCrNG9HQs48sjQE3TX7w/formResponse";
+// ============ CONFIG ============
+const FORM_URL      = "https://docs.google.com/forms/d/e/1FAIpQLSevZQcgCF9SXA8vYTR1kij0E-yuFyZCrNG9HQs48sjQE3TX7w/formResponse";
 const FIELD_GUIA    = "entry.773642673";
 const FIELD_ID_JSON = "entry.1128661543";
 const FIELD_QR      = "entry.1584746756";
 const FIELD_MODO    = "entry.1737704567";
+
+const GITHUB_TOKEN  = "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";
+const GITHUB_OWNER  = "programaciona1it-source";
+const GITHUB_REPO   = "scanner";
+const GITHUB_FOLDER = "qrs"; // carpeta dentro del repo donde se guardan los PNG
+// ================================
 
 let modo = "ambos";
 let etapa = "guia";
@@ -139,32 +142,17 @@ function setEstado(tipo, txt) {
 
 function iniciarScanner() {
   scanner = new Html5Qrcode("reader");
-  const config = {
-    fps: 15,
-    qrbox: { width: 250, height: 250 },
-    aspectRatio: 1.0,
-    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-  };
-
+  const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
   Html5Qrcode.getCameras().then(cameras => {
-    if (!cameras || cameras.length === 0) {
-      setEstado("err", "No se encontró cámara");
-      return;
-    }
-    // Preferir cámara trasera
+    if (!cameras || cameras.length === 0) { setEstado("err", "No se encontró cámara"); return; }
     const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
     scanner.start(cam.id, config, onScan, () => {}).then(() => {
       setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el JSON");
-    }).catch(err => {
-      setEstado("err", "Error cámara: " + err);
-    });
-  }).catch(err => {
-    // Intentar con environment directamente
+    }).catch(() => setEstado("err", "Error al iniciar cámara"));
+  }).catch(() => {
     scanner.start({ facingMode: "environment" }, config, onScan, () => {}).then(() => {
       setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el JSON");
-    }).catch(e => {
-      setEstado("err", "Sin acceso a cámara. Verificá permisos.");
-    });
+    }).catch(() => setEstado("err", "Sin acceso a cámara. Verificá permisos."));
   });
 }
 
@@ -174,7 +162,6 @@ function onScan(txt) {
   if (txt === ultimoTexto && ahora - ultimoTs < 2000) return;
   ultimoTexto = txt;
   ultimoTs = ahora;
-
   document.getElementById("preview").textContent = txt.length > 90 ? txt.slice(0,90)+"…" : txt;
 
   if (modo === "ambos") {
@@ -193,7 +180,7 @@ function onScan(txt) {
         const id = extraerID(txt);
         if (!id) { setEstado("err", "✗ No se extrajo ID"); vibrar(200); return; }
         vibrar([50,30,50]);
-        enviar(guiaActual, id, txt, "guia+json");
+        procesarCompleto(guiaActual, id, txt, "guia+json");
         resetEtapa();
       } else if (esGuia(txt)) {
         guiaActual = txt; vibrar(50);
@@ -209,7 +196,7 @@ function onScan(txt) {
       const id = extraerID(txt);
       if (!id) { setEstado("err", "✗ No se extrajo ID"); vibrar(200); return; }
       vibrar([50,30,50]);
-      enviar("", id, txt, "solo_json");
+      procesarCompleto("", id, txt, "solo_json");
     } else {
       setEstado("err", "✗ No es JSON válido");
       vibrar(200);
@@ -220,37 +207,109 @@ function onScan(txt) {
 
 function vibrar(p) { if (navigator.vibrate) navigator.vibrate(p); }
 
-function enviar(guia, idJson, jsonCompleto, modoUsado) {
+// ---- Proceso completo: Sheet + QR en GitHub ----
+async function procesarCompleto(guia, idJson, jsonCompleto, modoUsado) {
   escaneando = true;
   const nombreFoto = (modoUsado === "guia+json" ? guia : idJson) + ".png";
-  const id = Date.now();
   const hora = new Date().toLocaleTimeString("es-AR", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const logId = Date.now();
+
+  // Agregar al log
   const log = document.getElementById("log");
   const item = document.createElement("div");
   item.className = "log-item";
-  item.id = "item-" + id;
-  item.innerHTML = `<span class="ico" style="display:inline-block;animation:spin .8s linear infinite">↻</span><div class="info"><div class="nombre">📄 ${nombreFoto}</div><div class="sub">ID: ${idJson}${guia ? " · Guía: "+guia : ""}</div></div><div class="ts">${hora}</div>`;
+  item.id = "item-" + logId;
+  item.innerHTML = `
+    <span class="ico" id="ico-${logId}" style="display:inline-block;animation:spin .8s linear infinite">↻</span>
+    <div class="info">
+      <div class="nombre">📄 ${nombreFoto}</div>
+      <div class="sub" id="sub-${logId}">Enviando...</div>
+    </div>
+    <div class="ts">${hora}</div>`;
   log.prepend(item);
 
-  const body = new URLSearchParams();
-  body.append(FIELD_GUIA, guia);
-  body.append(FIELD_ID_JSON, idJson);
-  body.append(FIELD_QR, jsonCompleto);
-  body.append(FIELD_MODO, modoUsado);
+  const setSub = (txt) => { const el = document.getElementById("sub-"+logId); if(el) el.textContent = txt; };
+  const setIco = (ico, color) => {
+    const el = document.getElementById("ico-"+logId);
+    const it = document.getElementById("item-"+logId);
+    if(el) { el.style.animation="none"; el.textContent=ico; }
+    if(it && color) it.style.borderLeft = "3px solid " + color;
+  };
 
-  fetch(FORM_URL, {
-    method: "POST", mode: "no-cors",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-    body: body.toString()
-  }).then(() => {
+  try {
+    // 1. Guardar en Google Sheet
+    setSub("Guardando en Sheet...");
+    const body = new URLSearchParams();
+    body.append(FIELD_GUIA, guia);
+    body.append(FIELD_ID_JSON, idJson);
+    body.append(FIELD_QR, jsonCompleto);
+    body.append(FIELD_MODO, modoUsado);
+    await fetch(FORM_URL, {
+      method: "POST", mode: "no-cors",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: body.toString()
+    });
+
+    // 2. Generar QR via Labelary (HTTPS)
+    setSub("Generando QR...");
+    const jsonCorregido = jsonCompleto.replace(/'/g, '"');
+    const zpl = "^XA^FO250,275^BY4,4,0^BQN,2,7^FDLA," + jsonCorregido + "^FS^XZ^XA^MCY^XZ";
+    const labelaryUrl = "https://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/" + encodeURIComponent(zpl);
+
+    const respImg = await fetch(labelaryUrl);
+    if (!respImg.ok) throw new Error("Labelary error " + respImg.status);
+    const blob = await respImg.blob();
+
+    // 3. Convertir a base64
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(",")[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(blob);
+    });
+
+    // 4. Subir a GitHub
+    setSub("Subiendo a GitHub...");
+    const githubUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FOLDER}/${nombreFoto}`;
+
+    // Verificar si ya existe (para obtener sha)
+    let sha = null;
+    try {
+      const check = await fetch(githubUrl, {
+        headers: { "Authorization": "token " + GITHUB_TOKEN, "Accept": "application/vnd.github.v3+json" }
+      });
+      if (check.ok) { const data = await check.json(); sha = data.sha; }
+    } catch(e) {}
+
+    const payload = {
+      message: "QR: " + nombreFoto,
+      content: base64,
+      ...(sha ? { sha } : {})
+    };
+
+    const ghResp = await fetch(githubUrl, {
+      method: "PUT",
+      headers: {
+        "Authorization": "token " + GITHUB_TOKEN,
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!ghResp.ok) throw new Error("GitHub error " + ghResp.status);
+
     contadorOk++;
     document.getElementById("cnt").textContent = contadorOk;
-    const el = document.getElementById("item-"+id);
-    if (el) { el.querySelector(".ico").style.animation="none"; el.querySelector(".ico").textContent="✓"; el.style.borderLeft="3px solid var(--ok)"; }
-  }).catch(() => {
-    const el = document.getElementById("item-"+id);
-    if (el) { el.querySelector(".ico").style.animation="none"; el.querySelector(".ico").textContent="✗"; el.style.borderLeft="3px solid var(--err)"; }
-  }).finally(() => { setTimeout(() => escaneando = false, 700); });
+    setIco("✓", "var(--ok)");
+    setSub(`✓ Sheet + GitHub · ${GITHUB_FOLDER}/${nombreFoto}`);
+
+  } catch(err) {
+    setIco("✗", "var(--err)");
+    setSub("Error: " + err.message);
+  } finally {
+    setTimeout(() => escaneando = false, 700);
+  }
 }
 
 function abrirManual() { document.getElementById("modal").classList.add("open"); }
@@ -265,9 +324,9 @@ function guardarManual() {
   if (modo === "ambos" && !esGuia(guia)) { alert("Guía inválida (45XXXXXXX)"); return; }
   if (!esJSON(json)) { alert("JSON inválido"); return; }
   const id = extraerID(json);
-  if (!id) { alert("No se pudo extraer el ID del JSON"); return; }
+  if (!id) { alert("No se pudo extraer el ID"); return; }
   cerrarManual();
-  enviar(guia, id, json, modo === "ambos" ? "guia+json" : "solo_json");
+  procesarCompleto(guia, id, json, modo === "ambos" ? "guia+json" : "solo_json");
 }
 
 resetEtapa();
