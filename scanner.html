@@ -58,8 +58,8 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 </header>
 
 <div class="tabs">
-  <button class="tab active" onclick="setMode('ambos',this)">Guía + JSON</button>
-  <button class="tab" onclick="setMode('solo_json',this)">Solo JSON</button>
+  <button class="tab active" onclick="setMode('ambos',this)">Guía + QR</button>
+  <button class="tab" onclick="setMode('solo_json',this)">Solo QR</button>
 </div>
 
 <main>
@@ -76,8 +76,8 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3>Entrada Manual</h3>
-    <input id="m-guia" placeholder="Guía (45XXXXXXX) — vacío si es solo JSON" maxlength="9" inputmode="numeric">
-    <input id="m-json" placeholder="JSON completo" style="font-size:10px">
+    <input id="m-guia" placeholder="Guía (45XXXXXXX) — vacío si es solo QR" maxlength="9" inputmode="numeric">
+    <input id="m-json" placeholder="QR completo" style="font-size:10px">
     <div class="modal-btns">
       <button class="btn-cancel" onclick="cerrarManual()">Cancelar</button>
       <button class="btn-ok" onclick="guardarManual()">Guardar</button>
