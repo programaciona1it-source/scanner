@@ -93,7 +93,7 @@ const FIELD_ID_JSON = "entry.1128661543";
 const FIELD_QR      = "entry.1584746756";
 const FIELD_MODO    = "entry.1737704567";
 
-const GITHUB_TOKEN  = "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";
+const GITHUB_TOKEN  = window.location.hash.slice(1); // token va en la URL: scanner.html#ghp_TU_TOKEN
 const GITHUB_OWNER  = "programaciona1it-source";
 const GITHUB_REPO   = "scanner";
 const GITHUB_FOLDER = "qrs"; // carpeta dentro del repo donde se guardan los PNG
