@@ -59,7 +59,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
 <div class="tabs">
   <button class="tab active" onclick="setMode('ambos',this)">Guía + QR</button>
-  <button class="tab" onclick="setMode('solo_qr',this)">Solo QR</button>
+  <button class="tab" onclick="setMode('solo_json',this)">Solo QR</button>
 </div>
 
 <main>
@@ -76,8 +76,8 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3>Entrada Manual</h3>
-    <input id="m-guia" placeholder="Guía (45XXXXXXX) — vacío si es solo QR" maxlength="9" inputmode="numeric">
-    <input id="m-qr" placeholder="QR completo" style="font-size:10px">
+    <input id="m-guia" placeholder="Guía (45XXXXXXX) — vacío si es solo JSON" maxlength="9" inputmode="numeric">
+    <input id="m-json" placeholder="QR completo" style="font-size:10px">
     <div class="modal-btns">
       <button class="btn-cancel" onclick="cerrarManual()">Cancelar</button>
       <button class="btn-ok" onclick="guardarManual()">Guardar</button>
@@ -89,7 +89,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 // ============ CONFIG ============
 const FORM_URL      = "https://docs.google.com/forms/d/e/1FAIpQLSevZQcgCF9SXA8vYTR1kij0E-yuFyZCrNG9HQs48sjQE3TX7w/formResponse";
 const FIELD_GUIA    = "entry.773642673";
-const FIELD_ID_QR = "entry.1128661543";
+const FIELD_ID_JSON = "entry.1128661543";
 const FIELD_QR      = "entry.1584746756";
 const FIELD_MODO    = "entry.1737704567";
 // ================================
@@ -108,7 +108,7 @@ function extraerID(txt) {
   return m ? m[1] : null;
 }
 function esGuia(txt) { return /^45\d{7}$/.test(txt.trim()); }
-function esQR(txt) { return txt.includes("id") && txt.includes("hash_code") && txt.includes("sender_id"); }
+function esJSON(txt) { return txt.includes("id") && txt.includes("hash_code") && txt.includes("sender_id"); }
 
 function setMode(m, el) {
   modo = m;
@@ -124,7 +124,7 @@ function resetEtapa() {
     etapa = "guia"; guiaActual = "";
     setEstado("esperando", "Escaneá la guía (45XXXXXXX)");
   } else {
-    etapa = "qr";
+    etapa = "json";
     setEstado("esperando", "Escaneá el QR");
   }
   document.getElementById("preview").textContent = "—";
@@ -142,11 +142,11 @@ function iniciarScanner() {
     if (!cameras || cameras.length === 0) { setEstado("err", "No se encontró cámara"); return; }
     const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
     scanner.start(cam.id, config, onScan, () => {}).then(() => {
-      setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el JSON");
+      setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el QR");
     }).catch(() => setEstado("err", "Error al iniciar cámara"));
   }).catch(() => {
     scanner.start({ facingMode: "environment" }, config, onScan, () => {}).then(() => {
-      setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el JSON");
+      setEstado("esperando", modo === "ambos" ? "Escaneá la guía (45XXXXXXX)" : "Escaneá el QR");
     }).catch(() => setEstado("err", "Sin acceso a cámara. Verificá permisos."));
   });
 }
@@ -164,7 +164,7 @@ function onScan(txt) {
       if (esGuia(txt)) {
         guiaActual = txt; etapa = "json";
         vibrar(50);
-        setEstado("warn", "✓ Guía " + txt + " — escaneá el JSON");
+        setEstado("warn", "✓ Guía " + txt + " — escaneá el QR");
       } else {
         setEstado("err", "✗ Guía inválida (45XXXXXXX)");
         vibrar(200);
@@ -179,11 +179,11 @@ function onScan(txt) {
         resetEtapa();
       } else if (esGuia(txt)) {
         guiaActual = txt; vibrar(50);
-        setEstado("warn", "✓ Guía " + txt + " — escaneá el JSON");
+        setEstado("warn", "✓ Guía " + txt + " — escaneá el QR");
       } else {
-        setEstado("err", "✗ No es JSON válido");
+        setEstado("err", "✗ No es QR válido");
         vibrar(200);
-        setTimeout(() => setEstado("warn", "✓ Guía " + guiaActual + " — escaneá el JSON"), 1500);
+        setTimeout(() => setEstado("warn", "✓ Guía " + guiaActual + " — escaneá el QR"), 1500);
       }
     }
   } else {
@@ -193,9 +193,9 @@ function onScan(txt) {
       vibrar([50,30,50]);
       procesarCompleto("", id, txt, "solo_json");
     } else {
-      setEstado("err", "✗ No es JSON válido");
+      setEstado("err", "✗ No es QR válido");
       vibrar(200);
-      setTimeout(() => setEstado("esperando", "Escaneá el JSON"), 1500);
+      setTimeout(() => setEstado("esperando", "Escaneá el QR"), 1500);
     }
   }
 }
@@ -265,9 +265,9 @@ function guardarManual() {
   const guia = document.getElementById("m-guia").value.trim();
   const json  = document.getElementById("m-json").value.trim();
   if (modo === "ambos" && !esGuia(guia)) { alert("Guía inválida (45XXXXXXX)"); return; }
-  if (!esJSON(json)) { alert("JSON inválido"); return; }
+  if (!esJSON(json)) { alert("QR inválido"); return; }
   const id = extraerID(json);
-  if (!id) { alert("No se pudo extraer el ID"); return; }
+  if (!id) { alert("No se pudo extraer el ID del QR"); return; }
   cerrarManual();
   procesarCompleto(guia, id, json, modo === "ambos" ? "guia+json" : "solo_json");
 }
