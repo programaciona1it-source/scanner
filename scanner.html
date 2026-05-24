@@ -92,11 +92,6 @@ const FIELD_GUIA    = "entry.773642673";
 const FIELD_ID_JSON = "entry.1128661543";
 const FIELD_QR      = "entry.1584746756";
 const FIELD_MODO    = "entry.1737704567";
-
-const GITHUB_TOKEN  = window.location.hash.slice(1); // token va en la URL: scanner.html#ghp_TU_TOKEN
-const GITHUB_OWNER  = "programaciona1it-source";
-const GITHUB_REPO   = "scanner";
-const GITHUB_FOLDER = "qrs"; // carpeta dentro del repo donde se guardan los PNG
 // ================================
 
 let modo = "ambos";
@@ -207,23 +202,22 @@ function onScan(txt) {
 
 function vibrar(p) { if (navigator.vibrate) navigator.vibrate(p); }
 
-// ---- Proceso completo: Sheet + QR en GitHub ----
+// ---- Enviar a Sheet ----
 async function procesarCompleto(guia, idJson, jsonCompleto, modoUsado) {
   escaneando = true;
   const nombreFoto = (modoUsado === "guia+json" ? guia : idJson) + ".png";
   const hora = new Date().toLocaleTimeString("es-AR", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
   const logId = Date.now();
 
-  // Agregar al log
   const log = document.getElementById("log");
   const item = document.createElement("div");
   item.className = "log-item";
   item.id = "item-" + logId;
   item.innerHTML = `
-    <span class="ico" id="ico-${logId}" style="display:inline-block;animation:spin .8s linear infinite">↻</span>
+    <span class="ico" id="ico-${logId}" style="display:inline-block">↻</span>
     <div class="info">
       <div class="nombre">📄 ${nombreFoto}</div>
-      <div class="sub" id="sub-${logId}">Enviando...</div>
+      <div class="sub" id="sub-${logId}">Guardando...</div>
     </div>
     <div class="ts">${hora}</div>`;
   log.prepend(item);
@@ -237,8 +231,6 @@ async function procesarCompleto(guia, idJson, jsonCompleto, modoUsado) {
   };
 
   try {
-    // 1. Guardar en Google Sheet
-    setSub("Guardando en Sheet...");
     const body = new URLSearchParams();
     body.append(FIELD_GUIA, guia);
     body.append(FIELD_ID_JSON, idJson);
@@ -250,59 +242,10 @@ async function procesarCompleto(guia, idJson, jsonCompleto, modoUsado) {
       body: body.toString()
     });
 
-    // 2. Generar QR via Labelary (HTTPS)
-    setSub("Generando QR...");
-    const jsonCorregido = jsonCompleto.replace(/'/g, '"');
-    const zpl = "^XA^FO250,275^BY4,4,0^BQN,2,7^FDLA," + jsonCorregido + "^FS^XZ^XA^MCY^XZ";
-    const labelaryUrl = "https://api.labelary.com/v1/printers/8dpmm/labels/4x6/0/" + encodeURIComponent(zpl);
-
-    const respImg = await fetch(labelaryUrl);
-    if (!respImg.ok) throw new Error("Labelary error " + respImg.status);
-    const blob = await respImg.blob();
-
-    // 3. Convertir a base64
-    const base64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result.split(",")[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(blob);
-    });
-
-    // 4. Subir a GitHub
-    setSub("Subiendo a GitHub...");
-    const githubUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FOLDER}/${nombreFoto}`;
-
-    // Verificar si ya existe (para obtener sha)
-    let sha = null;
-    try {
-      const check = await fetch(githubUrl, {
-        headers: { "Authorization": "token " + GITHUB_TOKEN, "Accept": "application/vnd.github.v3+json" }
-      });
-      if (check.ok) { const data = await check.json(); sha = data.sha; }
-    } catch(e) {}
-
-    const payload = {
-      message: "QR: " + nombreFoto,
-      content: base64,
-      ...(sha ? { sha } : {})
-    };
-
-    const ghResp = await fetch(githubUrl, {
-      method: "PUT",
-      headers: {
-        "Authorization": "token " + GITHUB_TOKEN,
-        "Accept": "application/vnd.github.v3+json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!ghResp.ok) throw new Error("GitHub error " + ghResp.status);
-
     contadorOk++;
     document.getElementById("cnt").textContent = contadorOk;
     setIco("✓", "var(--ok)");
-    setSub(`✓ Sheet + GitHub · ${GITHUB_FOLDER}/${nombreFoto}`);
+    setSub("✓ Guardado · " + (modoUsado === "guia+json" ? "Guía: " + guia : "ID: " + idJson));
 
   } catch(err) {
     setIco("✗", "var(--err)");
