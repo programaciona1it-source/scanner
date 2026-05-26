@@ -115,6 +115,10 @@ function setMode(m, el) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   el.classList.add("active");
   resetEtapa();
+  // Reiniciar scanner para aplicar el nuevo qrbox
+  if (scanner) {
+    scanner.stop().then(() => iniciarScanner()).catch(() => iniciarScanner());
+  }
 }
 
 function editarEntrada(logId, guiaOrig, idJsonOrig, modoOrig) {
@@ -168,14 +172,21 @@ function iniciarScanner() {
   const config = {
     fps: 25,
     qrbox: (viewfinderWidth, viewfinderHeight) => {
-      // Rectángulo ancho para códigos de barra lineales, cuadrado para QR
-      if (etapa === "guia") {
-        return { width: Math.min(viewfinderWidth * 0.85, 350), height: 80 };
+      if (modo === "solo_json") {
+        // Solo QR cuadrado
+        const s = Math.min(viewfinderWidth * 0.8, 280);
+        return { width: s, height: s };
       } else {
-        return { width: Math.min(viewfinderWidth * 0.75, 280), height: Math.min(viewfinderWidth * 0.75, 280) };
+        // Guía + QR: empieza con rectángulo para código de barras
+        if (etapa === "guia") {
+          return { width: Math.min(viewfinderWidth * 0.85, 350), height: 80 };
+        } else {
+          const s = Math.min(viewfinderWidth * 0.75, 280);
+          return { width: s, height: s };
+        }
       }
     },
-    aspectRatio: 1.7,
+    aspectRatio: modo === "solo_json" ? 1.0 : 1.7,
     formatsToSupport: [
       Html5QrcodeSupportedFormats.QR_CODE,
       Html5QrcodeSupportedFormats.CODE_128,
