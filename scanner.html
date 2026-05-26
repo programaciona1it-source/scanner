@@ -117,6 +117,34 @@ function setMode(m, el) {
   resetEtapa();
 }
 
+function editarEntrada(logId, guiaOrig, idJsonOrig, modoOrig) {
+  const nuevaGuia = prompt(
+    modoOrig === "guia+json"
+      ? "Corregí el número de guía:"
+      : "Corregí el ID del QR:",
+    modoOrig === "guia+json" ? guiaOrig : idJsonOrig
+  );
+  if (!nuevaGuia || nuevaGuia.trim() === "") return;
+  const v = nuevaGuia.trim();
+
+  // Actualizar el log visualmente
+  const el = document.getElementById("item-" + logId);
+  if (el) {
+    const nombreNuevo = (modoOrig === "guia+json" ? v : idJsonOrig) + ".png";
+    el.querySelector(".nombre").textContent = "📄 " + nombreNuevo + " (corregido)";
+    el.querySelector(".sub").textContent = "Reenviando...";
+    el.querySelector(".ico").textContent = "↻";
+    el.style.borderLeft = "3px solid var(--warn)";
+  }
+
+  // Reenviar con el número corregido
+  if (modoOrig === "guia+json") {
+    procesarCompleto(v, idJsonOrig, "", modoOrig);
+  } else {
+    procesarCompleto("", v, "", modoOrig);
+  }
+}
+
 function resetEtapa() {
   escaneando = false;
   ultimoTexto = "";
@@ -137,7 +165,27 @@ function setEstado(tipo, txt) {
 
 function iniciarScanner() {
   scanner = new Html5Qrcode("reader");
-  const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+  const config = {
+    fps: 25,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      // Rectángulo ancho para códigos de barra lineales, cuadrado para QR
+      if (etapa === "guia") {
+        return { width: Math.min(viewfinderWidth * 0.85, 350), height: 80 };
+      } else {
+        return { width: Math.min(viewfinderWidth * 0.75, 280), height: Math.min(viewfinderWidth * 0.75, 280) };
+      }
+    },
+    aspectRatio: 1.7,
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+    ]
+  };
   Html5Qrcode.getCameras().then(cameras => {
     if (!cameras || cameras.length === 0) { setEstado("err", "No se encontró cámara"); return; }
     const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
@@ -219,7 +267,12 @@ async function procesarCompleto(guia, idJson, jsonCompleto, modoUsado) {
       <div class="nombre">📄 ${nombreFoto}</div>
       <div class="sub" id="sub-${logId}">Guardando...</div>
     </div>
-    <div class="ts">${hora}</div>`;
+    <div class="ts">${hora}</div>
+    <button onclick="editarEntrada('${logId}','${guia}','${idJson}','${modoUsado}')"
+      style="background:#1e3a5f;border:1px solid #30363d;color:#58a6ff;border-radius:6px;
+             font-size:9px;padding:2px 7px;cursor:pointer;flex-shrink:0;margin-left:4px">
+      ✏
+    </button>`;
   log.prepend(item);
 
   const setSub = (txt) => { const el = document.getElementById("sub-"+logId); if(el) el.textContent = txt; };
