@@ -115,9 +115,11 @@ function setMode(m, el) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   el.classList.add("active");
   resetEtapa();
-  // Reiniciar scanner para aplicar el nuevo qrbox
+  // Reiniciar scanner con timeout para que modo ya esté actualizado
   if (scanner) {
-    scanner.stop().then(() => iniciarScanner()).catch(() => iniciarScanner());
+    scanner.stop().catch(() => {}).finally(() => {
+      setTimeout(() => iniciarScanner(), 300);
+    });
   }
 }
 
@@ -169,24 +171,13 @@ function setEstado(tipo, txt) {
 
 function iniciarScanner() {
   scanner = new Html5Qrcode("reader");
+  const esSoloQR = (modo === "solo_json");
   const config = {
     fps: 25,
-    qrbox: (viewfinderWidth, viewfinderHeight) => {
-      if (modo === "solo_json") {
-        // Solo QR cuadrado
-        const s = Math.min(viewfinderWidth * 0.8, 280);
-        return { width: s, height: s };
-      } else {
-        // Guía + QR: empieza con rectángulo para código de barras
-        if (etapa === "guia") {
-          return { width: Math.min(viewfinderWidth * 0.85, 350), height: 80 };
-        } else {
-          const s = Math.min(viewfinderWidth * 0.75, 280);
-          return { width: s, height: s };
-        }
-      }
-    },
-    aspectRatio: modo === "solo_json" ? 1.0 : 1.7,
+    qrbox: esSoloQR
+      ? { width: 260, height: 260 }
+      : { width: 320, height: 80 },
+    aspectRatio: esSoloQR ? 1.0 : 1.7,
     formatsToSupport: [
       Html5QrcodeSupportedFormats.QR_CODE,
       Html5QrcodeSupportedFormats.CODE_128,
